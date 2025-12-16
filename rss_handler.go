@@ -24,23 +24,18 @@ func handlerRSS(s *state, cmd command) error {
 	return nil
 }
 
-func handlerAdd(s *state, cmd command) error {
+func handlerAdd(s *state, cmd command, user database.User) error {
 	if len(cmd.Args) != 2 {
 		return fmt.Errorf("usage: %s <title> <url>", cmd.Name)
 	}
 	title := cmd.Args[0]
 	url := cmd.Args[1]
 
-	currentUser, err := s.db.GetUser(context.Background(), s.cfg.CurrentUserName)
-	if err != nil {
-		return fmt.Errorf("couldn't get user: %w", err)
-	}
-
 	feed, err := s.db.CreateFeed(context.Background(), database.CreateFeedParams{
 		ID:     uuid.New(),
 		Name:   title,
 		Url:    url,
-		UserID: currentUser.ID,
+		UserID: user.ID,
 	})
 	if err != nil {
 		return fmt.Errorf("couldn't create feed: %w", err)
@@ -48,7 +43,7 @@ func handlerAdd(s *state, cmd command) error {
 
 	fmt.Printf("Feed created: %v\n", feed)
 
-	follow, err := insertFeedFollow(s, currentUser.ID, feed.ID)
+	follow, err := insertFeedFollow(s, user.ID, feed.ID)
 	if err != nil {
 		return fmt.Errorf("couldn't follow feed: %w", err)
 	}

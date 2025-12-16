@@ -9,18 +9,12 @@ import (
 	"github.com/n0m-d/gator/internal/database"
 )
 
-func handlerFollowFeed(state *state, cmd command) error {
+func handlerFollowFeed(state *state, cmd command, user database.User) error {
 	if len(cmd.Args) != 1 {
 		return errors.New("follow requires one argument")
 	}
 
 	url := cmd.Args[0]
-
-	currentUser := state.cfg.CurrentUserName
-	user, err := state.db.GetUser(context.Background(), currentUser)
-	if err != nil {
-		return fmt.Errorf("couldn't get user: %w", err)
-	}
 
 	feed, err := state.db.GetFeedByURL(context.Background(), url)
 	if err != nil {
@@ -48,12 +42,7 @@ func insertFeedFollow(state *state, userID uuid.UUID, feedID uuid.UUID) (databas
 	})
 }
 
-func handlerFollowingFeed(state *state, cmd command) error {
-	currentUser := state.cfg.CurrentUserName
-	user, err := state.db.GetUser(context.Background(), currentUser)
-	if err != nil {
-		return fmt.Errorf("couldn't get user: %w", err)
-	}
+func handlerFollowingFeed(state *state, cmd command, user database.User) error {
 
 	feedFollows, err := state.db.GetFeedFollowsForUser(context.Background(), user.ID)
 	if err != nil {
