@@ -9,11 +9,11 @@ import (
 )
 
 func handlerRSS(s *state, cmd command) error {
-	// if len(cmd.Args) != 1 {
-	// 	return fmt.Errorf("usage: %s <url>", cmd.Name)
-	// }
-	// url := cmd.Args[0]
-	url := "https://www.wagslane.dev/index.xml"
+	if len(cmd.Args) != 1 {
+		return fmt.Errorf("usage: %s <url>", cmd.Name)
+	}
+	url := cmd.Args[0]
+	// url := "https://www.wagslane.dev/index.xml"
 
 	feed, err := fetchFeed(context.Background(), url)
 	if err != nil {
