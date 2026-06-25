@@ -3,9 +3,12 @@ package tui
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/n0m-d/gator/internal/database"
 )
@@ -15,6 +18,7 @@ const (
 	tabFollowing        = 1
 	defaultPostsPerPage = 10
 	pagerHeight         = 1
+	toastDuration       = 2 * time.Second
 )
 
 type tab int
@@ -25,17 +29,20 @@ type model struct {
 	username string
 	styles   Styles
 
-	activeTab  tab
-	cursor     int
-	listOffset int
+	activeTab    tab
+	cursor       int
+	listOffset   int
 	postPage     int
 	postsPerPage int
 	totalPosts   int64
-	width      int
-	height     int
+	width        int
+	height       int
 
 	posts []database.Post
 	feeds []database.GetFeedFollowsForUserRow
+
+	toast      string
+	toastError bool
 
 	err     error
 	loading bool
@@ -47,6 +54,8 @@ type dataLoadedMsg struct {
 	totalPosts int64
 	err        error
 }
+
+type clearToastMsg struct{}
 
 func NewModel(db *database.Queries, user database.User, username string) model {
 	return model{
@@ -118,6 +127,12 @@ func (m model) loadData() tea.Msg {
 	return dataLoadedMsg{posts: posts, feeds: feeds, totalPosts: total}
 }
 
+func (m model) dismissToastCmd() tea.Cmd {
+	return tea.Tick(toastDuration, func(time.Time) tea.Msg {
+		return clearToastMsg{}
+	})
+}
+
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -126,6 +141,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.postsPerPage = m.calcPostsPerPage()
 		m.loading = true
 		return m, m.loadData
+
+	case clearToastMsg:
+		m.toast = ""
+		m.toastError = false
+		return m, nil
 
 	case dataLoadedMsg:
 		m.loading = false
@@ -145,6 +165,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
+		if m.toast != "" {
+			m.toast = ""
+			m.toastError = false
+		}
+
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
@@ -199,6 +224,33 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 			return m, nil
+		case "v":
+			if m.activeTab != tabPosts || len(m.posts) == 0 || m.cursor >= len(m.posts) {
+				return m, nil
+			}
+
+			post := m.posts[m.cursor]
+			u, err := url.Parse(post.Url)
+			if err != nil {
+				m.toast = "Couldn't parse URL"
+				m.toastError = true
+				return m, m.dismissToastCmd()
+			}
+			if u.Scheme != "http" && u.Scheme != "https" {
+				m.toast = "Unsupported URL scheme"
+				m.toastError = true
+				return m, m.dismissToastCmd()
+			}
+
+			if err := clipboard.WriteAll(post.Url); err != nil {
+				m.toast = "Couldn't copy to clipboard"
+				m.toastError = true
+				return m, m.dismissToastCmd()
+			}
+
+			m.toast = "URL copied to clipboard"
+			m.toastError = false
+			return m, m.dismissToastCmd()
 		}
 	}
 
@@ -273,8 +325,22 @@ func (m model) View() string {
 		pager = m.renderPager()
 	}
 
+	parts := []string{header, "", content, "", pager}
+	if m.toast != "" {
+		contentWidth := m.width - 4
+		if contentWidth < 20 {
+			contentWidth = 20
+		}
+		toast := lipgloss.NewStyle().
+			Width(contentWidth).
+			Align(lipgloss.Center).
+			Render(m.renderToast())
+		parts = append(parts, "", toast)
+	}
+	parts = append(parts, "", footer)
+
 	return lipgloss.Place(m.width, m.height, lipgloss.Left, lipgloss.Top,
-		lipgloss.JoinVertical(lipgloss.Left, header, "", content, "", pager, "", footer),
+		lipgloss.JoinVertical(lipgloss.Left, parts...),
 	)
 }
 

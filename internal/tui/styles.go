@@ -29,6 +29,8 @@ type Styles struct {
 	Empty        lipgloss.Style
 	Banner       lipgloss.Style
 	URL          lipgloss.Style
+	Toast        lipgloss.Style
+	ToastError   lipgloss.Style
 }
 
 func NewStyles() Styles {
@@ -108,5 +110,19 @@ func NewStyles() Styles {
 		Banner: lipgloss.NewStyle().
 			Foreground(lipgloss.Color(gatorGreen)),
 		URL: lipgloss.NewStyle().Foreground(special),
+		Toast: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#FFF7DB")).
+			Background(lipgloss.Color(gatorGreen)).
+			Padding(0, 2).
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color(gatorGreen)),
+		ToastError: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#FFF7DB")).
+			Background(lipgloss.Color("#FF5F87")).
+			Padding(0, 2).
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#FF5F87")),
 	}
 }

@@ -184,6 +184,14 @@ func (m model) detailLine(label, value string, width int) string {
 		m.styles.DetailValue.Render(truncate(value, maxVal))
 }
 
+func (m model) renderToast() string {
+	style := m.styles.Toast
+	if m.toastError {
+		style = m.styles.ToastError
+	}
+	return style.Render(m.toast)
+}
+
 func (m model) renderStatusBar() string {
 	contentWidth := m.width - 4
 	if contentWidth < 20 {
@@ -195,7 +203,7 @@ func (m model) renderStatusBar() string {
 		Width(max(10, contentWidth/3-lipgloss.Width(userKey))).
 		Render(m.username)
 
-	help := m.styles.Help.Render("tab: switch  j/k: move  h/l: page  r: refresh  q: quit")
+	help := m.styles.Help.Render("tab: switch  j/k: move  h/l: page  v: copy url  r: refresh  q: quit")
 
 	bar := lipgloss.JoinHorizontal(lipgloss.Top, userKey, userVal, "  ", help)
 	return m.styles.StatusBar.Width(contentWidth).Render(bar)
