@@ -139,7 +139,7 @@ func (m model) renderPostDetail(post database.Post, width int) string {
 
 func (m model) renderFollowing(contentWidth, listHeight int) string {
 	if len(m.feeds) == 0 {
-		return m.styles.Empty.Render("You're not following any feeds. Use ./gator follow <url> from the CLI.")
+		return m.styles.Empty.Render("You're not following any feeds. Press a to add one.")
 	}
 
 	var items []string
@@ -203,7 +203,7 @@ func (m model) renderStatusBar() string {
 		Width(max(10, contentWidth/3-lipgloss.Width(userKey))).
 		Render(m.username)
 
-	help := m.styles.Help.Render("tab: switch  j/k: move  h/l: page  v: copy url  r: refresh  q: quit")
+	help := m.styles.Help.Render("tab: switch  j/k: move  h/l: page  v: copy url  u: unfollow feed a:add feed  r: refresh  q: quit")
 
 	bar := lipgloss.JoinHorizontal(lipgloss.Top, userKey, userVal, "  ", help)
 	return m.styles.StatusBar.Width(contentWidth).Render(bar)

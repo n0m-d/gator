@@ -9,6 +9,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/atotto/clipboard"
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/n0m-d/gator/internal/database"
 )
@@ -43,6 +44,11 @@ type model struct {
 
 	toast      string
 	toastError bool
+
+	addingFeed   bool
+	addFeedField addFeedField
+	nameInput    textinput.Model
+	urlInput     textinput.Model
 
 	err     error
 	loading bool
@@ -164,14 +170,35 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.clampCursor()
 		return m, nil
 
+	case feedCreatedMsg:
+		m.loading = false
+		if msg.err != nil {
+			m.toast = msg.err.Error()
+			m.toastError = true
+			return m, tea.Batch(m.loadData, m.dismissToastCmd())
+		}
+		m.toast = fmt.Sprintf("Added and followed %s", msg.name)
+		m.toastError = false
+		return m, tea.Batch(m.loadData, m.dismissToastCmd())
+
 	case tea.KeyMsg:
+		if m.addingFeed {
+			return m.updateAddFeed(msg)
+		}
+
 		if m.toast != "" {
 			m.toast = ""
 			m.toastError = false
 		}
 
 		switch msg.String() {
-		case "ctrl+c", "q":
+		case "ctrl+c":
+			return m, tea.Quit
+		case "q":
+			if m.addingFeed {
+				m.addingFeed = false
+				return m, nil
+			}
 			return m, tea.Quit
 		case "tab":
 			m.activeTab = (m.activeTab + 1) % 2
@@ -251,6 +278,34 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.toast = "URL copied to clipboard"
 			m.toastError = false
 			return m, m.dismissToastCmd()
+
+		case "u":
+			if m.activeTab != tabFollowing || len(m.feeds) == 0 || m.cursor >= len(m.feeds) {
+				return m, nil
+			}
+
+			feed := m.feeds[m.cursor]
+			err := m.db.DeleteFeedFollowByFeedIdAndUserId(context.Background(), database.DeleteFeedFollowByFeedIdAndUserIdParams{
+				FeedID: feed.FeedID,
+				UserID: m.user.ID,
+			})
+			if err != nil {
+				m.toast = "Couldn't unfollow feed"
+				m.toastError = true
+				return m, m.dismissToastCmd()
+			}
+
+			m.toast = fmt.Sprintf("Unfollowed %s", feed.FeedName)
+			m.toastError = false
+			m.loading = true
+			return m, tea.Batch(m.loadData, m.dismissToastCmd())
+
+		case "a":
+			if m.activeTab != tabFollowing || m.addingFeed {
+				return m, nil
+			}
+			m.initAddFeedForm()
+			return m, textinput.Blink
 		}
 	}
 
@@ -326,6 +381,17 @@ func (m model) View() string {
 	}
 
 	parts := []string{header, "", content, "", pager}
+	if m.addingFeed {
+		contentWidth := m.width - 4
+		if contentWidth < 20 {
+			contentWidth = 20
+		}
+		dialog := lipgloss.NewStyle().
+			Width(contentWidth).
+			Align(lipgloss.Center).
+			Render(m.renderAddFeedDialog())
+		parts = append(parts, "", dialog)
+	}
 	if m.toast != "" {
 		contentWidth := m.width - 4
 		if contentWidth < 20 {
@@ -345,7 +411,7 @@ func (m model) View() string {
 }
 
 func (m model) renderHeader() string {
-	return lipgloss.JoinVertical(lipgloss.Left,
+	return lipgloss.JoinVertical(lipgloss.Center,
 		m.styles.Banner.Render(banner),
 		m.renderTabs(),
 	)
