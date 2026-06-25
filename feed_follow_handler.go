@@ -70,7 +70,7 @@ func handlerUnfollowFeed(state *state, cmd command, user database.User) error {
 		return fmt.Errorf("couldn't get feed: %w", err)
 	}
 
-	fmt.Printf("Unfollowing feed: %s\n", feed)
+	fmt.Printf("Unfollowing feed: %s\n", feed.Name)
 
 	err = state.db.DeleteFeedFollowByFeedIdAndUserId(context.Background(), database.DeleteFeedFollowByFeedIdAndUserIdParams{
 		FeedID: feed.ID,

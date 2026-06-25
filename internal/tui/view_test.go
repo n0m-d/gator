@@ -50,6 +50,19 @@ func TestViewFollowingDoesNotPanic(t *testing.T) {
 	_ = m.View()
 }
 
+func TestViewAggregatingDoesNotPanic(t *testing.T) {
+	m := NewModel(nil, database.User{}, "tester")
+	m.width = 80
+	m.height = 24
+	m.aggregating = true
+	m.scraping = true
+	m.totalFeeds = 5
+	m.feedsFetched = 2
+	m.lastScrapeAt = time.Now()
+
+	_ = m.View()
+}
+
 func TestViewEmptyPostsDoesNotPanic(t *testing.T) {
 	m := model{
 		username:   "tester",

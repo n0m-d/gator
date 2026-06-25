@@ -1,4 +1,4 @@
-package main
+package rss
 
 import (
 	"context"
@@ -11,24 +11,23 @@ import (
 	"time"
 )
 
-type RSSFeed struct {
+type Feed struct {
 	Channel struct {
-		Title       string    `xml:"title"`
-		Link        string    `xml:"link"`
-		Description string    `xml:"description"`
-		Item        []RSSItem `xml:"item"`
+		Title       string `xml:"title"`
+		Link        string `xml:"link"`
+		Description string `xml:"description"`
+		Item        []Item `xml:"item"`
 	} `xml:"channel"`
 }
 
-type RSSItem struct {
+type Item struct {
 	Title       string `xml:"title"`
 	Link        string `xml:"link"`
 	Description string `xml:"description"`
 	PubDate     string `xml:"pubDate"`
 }
 
-func fetchFeed(ctx context.Context, feedURL string) (*RSSFeed, error) {
-
+func Fetch(ctx context.Context, feedURL string) (*Feed, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, feedURL, nil)
 	if err != nil {
 		return nil, err
@@ -51,7 +50,7 @@ func fetchFeed(ctx context.Context, feedURL string) (*RSSFeed, error) {
 		return nil, err
 	}
 
-	var feed RSSFeed
+	var feed Feed
 	if err := xml.Unmarshal(data, &feed); err != nil {
 		return nil, err
 	}
@@ -69,7 +68,7 @@ func fetchFeed(ctx context.Context, feedURL string) (*RSSFeed, error) {
 	return &feed, nil
 }
 
-func parsePublishedAt(dateStr string) sql.NullTime {
+func ParsePublishedAt(dateStr string) sql.NullTime {
 	if dateStr == "" {
 		return sql.NullTime{}
 	}

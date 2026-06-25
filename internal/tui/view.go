@@ -168,7 +168,7 @@ func (m model) renderFollowing(contentWidth, listHeight int) string {
 	detail := m.styles.DetailBox.Width(contentWidth).Render(
 		strings.Join([]string{
 			m.detailLine("Feed", feed.FeedName, contentWidth),
-			m.detailLine("URL", feed.FeedURL, contentWidth),
+			m.detailLine("URL", feed.FeedUrl, contentWidth),
 			m.detailLine("Followed", feed.CreatedAt.Format(time.RFC1123), contentWidth),
 		}, "\n"),
 	)
@@ -182,6 +182,32 @@ func (m model) detailLine(label, value string, width int) string {
 	}
 	return m.styles.DetailLabel.Render(label+": ") +
 		m.styles.DetailValue.Render(truncate(value, maxVal))
+}
+
+func (m model) statusLabel() string {
+	if m.aggregating {
+		return "Agg"
+	}
+	return "User"
+}
+
+func (m model) renderAggProgress() string {
+	if !m.aggregating {
+		return ""
+	}
+
+	contentWidth := m.width - 4
+	if contentWidth < 20 {
+		contentWidth = 20
+	}
+
+	bar := m.aggProgress.ViewAs(m.aggProgressPercent())
+	label := m.styles.Help.Render(m.aggProgressLabel())
+	row := lipgloss.JoinHorizontal(lipgloss.Center, bar, " ", label)
+
+	return lipgloss.NewStyle().
+		Width(contentWidth).
+		Render(row)
 }
 
 func (m model) renderToast() string {
@@ -198,12 +224,12 @@ func (m model) renderStatusBar() string {
 		contentWidth = 20
 	}
 
-	userKey := m.styles.StatusKey.Render("User")
+	userKey := m.styles.StatusKey.Render(m.statusLabel())
 	userVal := m.styles.StatusValue.
 		Width(max(10, contentWidth/3-lipgloss.Width(userKey))).
 		Render(m.username)
 
-	help := m.styles.Help.Render("tab: switch  j/k: move  h/l: page  v: copy url  u: unfollow feed a:add feed  r: refresh  q: quit")
+	help := m.styles.Help.Render("tab: switch  j/k: move  h/l: page  v: copy  u: unfollow  a: add  r: agg  q: quit")
 
 	bar := lipgloss.JoinHorizontal(lipgloss.Top, userKey, userVal, "  ", help)
 	return m.styles.StatusBar.Width(contentWidth).Render(bar)

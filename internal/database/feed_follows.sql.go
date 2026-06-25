@@ -86,7 +86,7 @@ SELECT
     ff.updated_at,
     u.name AS user_name,
     fd.name AS feed_name,
-	fd.url AS feed_url
+    fd.url AS feed_url
 FROM feed_follows ff
 JOIN users u ON u.id = ff.user_id
 JOIN feeds fd ON fd.id = ff.feed_id
@@ -101,7 +101,7 @@ type GetFeedFollowsForUserRow struct {
 	UpdatedAt time.Time
 	UserName  string
 	FeedName  string
-	FeedURL   string
+	FeedUrl   string
 }
 
 func (q *Queries) GetFeedFollowsForUser(ctx context.Context, userID uuid.UUID) ([]GetFeedFollowsForUserRow, error) {
@@ -121,7 +121,7 @@ func (q *Queries) GetFeedFollowsForUser(ctx context.Context, userID uuid.UUID) (
 			&i.UpdatedAt,
 			&i.UserName,
 			&i.FeedName,
-			&i.FeedURL,
+			&i.FeedUrl,
 		); err != nil {
 			return nil, err
 		}

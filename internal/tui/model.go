@@ -9,6 +9,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/atotto/clipboard"
+	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/n0m-d/gator/internal/database"
@@ -19,7 +20,10 @@ const (
 	tabFollowing        = 1
 	defaultPostsPerPage = 10
 	pagerHeight         = 1
+	aggProgressHeight   = 1
 	toastDuration       = 2 * time.Second
+	defaultAggInterval  = time.Minute
+	progressTick        = 200 * time.Millisecond
 )
 
 type tab int
@@ -50,6 +54,14 @@ type model struct {
 	nameInput    textinput.Model
 	urlInput     textinput.Model
 
+	aggregating  bool
+	aggInterval  time.Duration
+	scraping     bool
+	totalFeeds   int64
+	feedsFetched int
+	lastScrapeAt time.Time
+	aggProgress  progress.Model
+
 	err     error
 	loading bool
 }
@@ -64,12 +76,20 @@ type dataLoadedMsg struct {
 type clearToastMsg struct{}
 
 func NewModel(db *database.Queries, user database.User, username string) model {
+	aggBar := progress.New(
+		progress.WithGradient("#00A95C", "#73F59F"),
+		progress.WithWidth(40),
+		progress.WithoutPercentage(),
+	)
+
 	return model{
-		db:       db,
-		user:     user,
-		username: username,
-		styles:   NewStyles(),
-		loading:  true,
+		db:          db,
+		user:        user,
+		username:    username,
+		styles:      NewStyles(),
+		loading:     true,
+		aggInterval: defaultAggInterval,
+		aggProgress: aggBar,
 	}
 }
 
@@ -84,6 +104,9 @@ func (m model) calcPostsPerPage() int {
 	header := m.renderHeader()
 	footer := m.renderStatusBar()
 	used := lipgloss.Height(header) + lipgloss.Height(footer) + pagerHeight + 3
+	if m.aggregating {
+		used += aggProgressHeight
+	}
 	remaining := m.height - used
 	detailReserve := min(10, remaining/2)
 	rows := remaining - detailReserve - 2
@@ -145,6 +168,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.postsPerPage = m.calcPostsPerPage()
+		barWidth := msg.Width - 24
+		if barWidth < 20 {
+			barWidth = 20
+		}
+		m.aggProgress.Width = barWidth
 		m.loading = true
 		return m, m.loadData
 
@@ -181,6 +209,21 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.toastError = false
 		return m, tea.Batch(m.loadData, m.dismissToastCmd())
 
+	case aggTickMsg:
+		return m.handleAggTick()
+
+	case scrapeDoneMsg:
+		return m.handleScrapeDone(msg)
+
+	case feedCountMsg:
+		return m.handleFeedCount(msg)
+
+	case progressTickMsg:
+		if !m.aggregating {
+			return m, nil
+		}
+		return m, m.scheduleProgressTick()
+
 	case tea.KeyMsg:
 		if m.addingFeed {
 			return m.updateAddFeed(msg)
@@ -216,9 +259,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.listOffset = 0
 			return m, nil
 		case "r":
-			m.loading = true
-			m.err = nil
-			return m, m.loadData
+			return m.toggleAgg()
 		case "left", "h", "[":
 			if m.activeTab == tabPosts && m.postPage > 0 {
 				m.postPage--
@@ -380,7 +421,13 @@ func (m model) View() string {
 		pager = m.renderPager()
 	}
 
-	parts := []string{header, "", content, "", pager}
+	aggBar := m.renderAggProgress()
+
+	parts := []string{header, ""}
+	if aggBar != "" {
+		parts = append(parts, aggBar, "")
+	}
+	parts = append(parts, content, "", pager)
 	if m.addingFeed {
 		contentWidth := m.width - 4
 		if contentWidth < 20 {
