@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -285,8 +286,15 @@ func (m model) renderHeader() string {
 }
 
 func Run(db *database.Queries, user database.User, username string) error {
+	defer restoreTerminal()
+
 	m := NewModel(db, user, username)
-	p := tea.NewProgram(m, tea.WithAltScreen())
+	p := tea.NewProgram(
+		m,
+		tea.WithAltScreen(),
+		tea.WithInput(os.Stdin),
+		tea.WithOutput(os.Stdout),
+	)
 	_, err := p.Run()
 	return err
 }
