@@ -168,6 +168,7 @@ func (m model) renderFollowing(contentWidth, listHeight int) string {
 	detail := m.styles.DetailBox.Width(contentWidth).Render(
 		strings.Join([]string{
 			m.detailLine("Feed", feed.FeedName, contentWidth),
+			m.detailLine("URL", feed.FeedURL, contentWidth),
 			m.detailLine("Followed", feed.CreatedAt.Format(time.RFC1123), contentWidth),
 		}, "\n"),
 	)
