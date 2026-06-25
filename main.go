@@ -40,7 +40,7 @@ func main() {
 	cmds.register("register", handlerRegister)
 	cmds.register("reset", handlerReSet)
 	cmds.register("users", handlerListUsers)
-	cmds.register("agg", handlerRSS)
+	cmds.register("agg", handlerAgg)
 	cmds.register("addfeed", middlewareLoggedIn(handlerAdd))
 	cmds.register("feeds", handlerListFeeds)
 	cmds.register("follow", middlewareLoggedIn(handlerFollowFeed))

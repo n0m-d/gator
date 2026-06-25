@@ -3,25 +3,30 @@ package main
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/n0m-d/gator/internal/database"
 )
 
-func handlerRSS(s *state, cmd command) error {
+func handlerAgg(s *state, cmd command) error {
 	if len(cmd.Args) != 1 {
-		return fmt.Errorf("usage: %s <url>", cmd.Name)
+		return fmt.Errorf("usage: %s <time_between_reqs>", cmd.Name)
 	}
-	url := cmd.Args[0]
-	// url := "https://www.wagslane.dev/index.xml"
 
-	feed, err := fetchFeed(context.Background(), url)
+	timeBetweenRequests, err := time.ParseDuration(cmd.Args[0])
 	if err != nil {
-		return fmt.Errorf("couldn't fetch feed: %w", err)
+		return fmt.Errorf("invalid duration: %w", err)
 	}
 
-	fmt.Printf("Feed: %v\n", feed)
-	return nil
+	fmt.Printf("Collecting feeds every %v\n", timeBetweenRequests)
+
+	ticker := time.NewTicker(timeBetweenRequests)
+	for ; ; <-ticker.C {
+		if err := scrapeFeeds(s); err != nil {
+			return err
+		}
+	}
 }
 
 func handlerAdd(s *state, cmd command, user database.User) error {
