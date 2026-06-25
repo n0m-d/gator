@@ -2,6 +2,8 @@
 
 A command-line RSS feed aggregator written in Go. Gator lets you register users, subscribe to feeds, periodically scrape new posts, and browse saved articles from the terminal.
 
+> https://www.boot.dev/courses/build-blog-aggregator-golang
+
 ## Features
 
 - User registration and session management via a local config file

@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 	"os"
 
@@ -47,9 +48,20 @@ func main() {
 	cmds.register("following", middlewareLoggedIn(handlerFollowingFeed))
 	cmds.register("unfollow", middlewareLoggedIn(handlerUnfollowFeed))
 	cmds.register("browse", middlewareLoggedIn(handlerBrowse))
-
+	banner :=
+		`
+ ██████╗  █████╗ ████████╗ ██████╗ ██████╗ 
+██╔════╝ ██╔══██╗╚══██╔══╝██╔═══██╗██╔══██╗             
+██║  ███╗███████║   ██║   ██║   ██║██████╔╝            
+██║   ██║██╔══██║   ██║   ██║   ██║██╔══██╗    
+╚██████╔╝██║  ██║   ██║   ╚██████╔╝██║  ██║ 
+ ╚═════╝ ╚═╝  ╚═╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝ 🐊 
+ 
+`
+	fmt.Printf("%s%s\n%s", "\x1b[38;2;0;169;92m", banner, "\033[0m")
 	if len(os.Args) < 2 {
-		log.Fatal("Usage: cli <command> [args...]")
+		log.Print("Usage: cli <command> [args...]")
+		os.Exit(0)
 	}
 
 	cmdName := os.Args[1]
