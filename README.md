@@ -1,17 +1,19 @@
 # Gator
 
-A command-line RSS feed aggregator written in Go. Gator lets you register users, subscribe to feeds, periodically scrape new posts, and browse saved articles from the terminal.
+A terminal RSS feed aggregator written in Go. Gator runs as an interactive TUI for browsing posts, managing feeds, and collecting articles in the background. A small set of CLI commands remains for account setup and scripting.
 
 > https://www.boot.dev/courses/build-blog-aggregator-golang
 
 ## Features
 
-- User registration and session management via a local config file
-- Add and list RSS feeds
-- Follow and unfollow feeds per user
-- Background aggregation that fetches feeds on a schedule and stores posts in PostgreSQL
-- Browse recent posts from feeds you follow
-- Interactive terminal UI (TUI) for browsing posts and followed feeds
+- Interactive terminal UI (Bubble Tea + Lip Gloss) for day-to-day use
+- Built-in login and registration screen on first launch
+- Browse paginated posts from feeds you follow
+- Add, follow, and unfollow feeds from the TUI
+- Background aggregation with progress bar (press `r` to start/stop)
+- Copy post URLs to the clipboard
+- PostgreSQL storage with goose migrations and sqlc-generated queries
+- Minimal CLI for `login`, `register`, `users`, and `reset`
 
 ## Prerequisites
 
@@ -35,7 +37,7 @@ go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
 createdb gator
 ```
 
-### 2. Configure the CLI
+### 2. Configure the app
 
 Create `~/.gatorconfig.json` in your home directory:
 
@@ -46,7 +48,7 @@ Create `~/.gatorconfig.json` in your home directory:
 }
 ```
 
-Replace the connection string with your PostgreSQL credentials. `current_user_name` is set automatically when you register or log in.
+Replace the connection string with your PostgreSQL credentials. `current_user_name` is set when you log in or register.
 
 ### 3. Run migrations
 
@@ -66,123 +68,109 @@ goose -dir sql/schema postgres "postgres://username:password@localhost:5432/gato
 
 ```bash
 go build -o gator .
+./gator
 ```
 
-**TUI mode** (no arguments — requires a logged-in user):
+On first launch you will see a login/register screen. You can also create an account from the shell:
+
+```bash
+./gator register alice
+./gator
+```
+
+## TUI usage
+
+Launch with no arguments:
 
 ```bash
 ./gator
 ```
 
-**CLI mode** (pass a command):
+### Authentication screen
 
-```bash
-./gator <command> [args...]
-```
+Shown when no user is logged in.
 
-You can also run without building:
+| Key | Action |
+|-----|--------|
+| `tab` | Switch between Login and Register |
+| `enter` | Submit |
+| `q` / `ctrl+c` | Quit |
 
-```bash
-go run .
-go run . browse 5
-```
-
-## Usage
-
-### TUI
-
-Launch with no arguments after logging in:
-
-```bash
-./gator login alice
-./gator
-```
+### Main app
 
 | Key | Action |
 |-----|--------|
 | `tab` / `1` / `2` | Switch between Posts and Following tabs |
 | `j` / `k` or `↑` / `↓` | Navigate list |
 | `h` / `l` or `←` / `→` | Previous / next page (Posts tab) |
-| `r` | Refresh data from database |
-| `q` | Quit |
+| `v` | Copy selected post URL to clipboard |
+| `u` | Unfollow selected feed (Following tab) |
+| `a` | Add a feed (Following tab) |
+| `r` | Start/stop background aggregation |
+| `q` / `ctrl+c` | Quit |
 
-The status bar shows the current user. Posts are loaded from feeds you follow (same as `./gator browse`).
-
-### CLI commands
-
-| Command | Description |
-|---------|-------------|
-| `register <name>` | Create a new user and log in as them |
-| `login <name>` | Switch to an existing user |
-| `users` | List all users (current user is marked) |
-| `reset` | Delete all users |
-
-### Feed commands
-
-| Command | Description |
-|---------|-------------|
-| `addfeed <title> <url>` | Add a feed and automatically follow it (requires login) |
-| `feeds` | List all feeds |
-| `follow <url>` | Follow an existing feed by URL (requires login) |
-| `following` | List feeds the current user follows (requires login) |
-| `unfollow <url>` | Stop following a feed (requires login) |
-
-### Aggregation and posts
-
-| Command | Description |
-|---------|-------------|
-| `agg <duration>` | Continuously fetch feeds on an interval (e.g. `30s`, `1m`, `5m`) |
-| `browse [limit]` | Show recent posts from followed feeds (requires login; default limit is 2) |
+While aggregation is running, a progress bar shows fetch status and time until the next scrape. The status bar label switches from **User** to **Agg**.
 
 ### Example workflow
 
 ```bash
 ./gator register alice
-./gator addfeed "Hacker News" https://news.ycombinator.com/rss
-./gator agg 1m
+./gator
 ```
 
-In another terminal:
+In the TUI:
+
+1. Switch to the **Following** tab (`2`)
+2. Press `a` to add a feed (name + URL)
+3. Press `r` to start collecting posts
+4. Switch to **Posts** (`1`) to browse articles
+
+## CLI commands
+
+The TUI is the primary interface. These commands are available for scripts, automation, or quick account management:
+
+| Command | Description |
+|---------|-------------|
+| `register <name>` | Create a new user and log in |
+| `login <name>` | Log in as an existing user |
+| `users` | List all users (current user marked with `*`) |
+| `reset` | Delete all users (development) |
+| `help` | Show available CLI commands |
 
 ```bash
+./gator help
 ./gator login alice
-./gator browse 5
+./gator users
 ```
+
+Feed management, browsing, and aggregation are only available in the TUI.
 
 ## Project structure
 
 ```
 .
-├── main.go                 # Entry point; TUI when no args, CLI otherwise
-├── commands.go             # Command dispatcher
-├── middleware.go           # Login-required middleware
-├── user_handler.go         # User commands (register, login, users, reset)
-├── rss_handler.go          # Feed commands (addfeed, feeds, agg)
-├── feed_follow_handler.go  # Follow/unfollow commands
-├── posts_handler.go        # Browse command
-├── aggregator.go           # Feed scraping and post persistence
-├── rss.go                  # RSS fetching and date parsing
+├── main.go                     # Entry point: TUI by default, CLI for auth
 ├── internal/
+│   ├── cli/                    # Login, register, users, reset
 │   ├── config/
-│   │   └── config.go       # Reads/writes ~/.gatorconfig.json
-│   ├── tui/
-│   │   ├── model.go        # Bubble Tea model and key handling
-│   │   ├── view.go         # Lip Gloss rendering
-│   │   └── styles.go       # TUI theme/styles
-│   └── database/           # sqlc-generated query code (do not edit by hand)
+│   │   └── config.go           # Reads/writes ~/.gatorconfig.json
+│   ├── database/               # sqlc-generated query code (do not edit)
+│   ├── rss/
+│   │   └── rss.go              # RSS fetch and parse
+│   ├── scraper/
+│   │   └── scraper.go          # Feed scraping and post persistence
+│   └── tui/
+│       ├── model.go            # Bubble Tea model and key handling
+│       ├── view.go             # Lip Gloss rendering
+│       ├── styles.go           # Theme
+│       ├── auth.go             # Login/register screen
+│       ├── add_feed.go         # Add feed dialog
+│       ├── agg.go              # Background aggregation
+│       └── terminal.go         # Terminal cleanup on exit
 ├── sql/
-│   ├── schema/             # Goose migration files
-│   │   ├── 001_users.sql
-│   │   ├── 002_feeds.sql
-│   │   ├── 003_feed_follows.sql
-│   │   ├── 004_feeds_last_fetched_at.sql
-│   │   └── 005_posts.sql
-│   └── queries/            # sqlc query definitions
-│       ├── users.sql
-│       ├── feeds.sql
-│       ├── feed_follows.sql
-│       └── posts.sql
-├── sqlc.yaml               # sqlc configuration
+│   ├── schema/                 # Goose migration files
+│   └── queries/                # sqlc query definitions
+├── sqlc.yaml
 ├── go.mod
 └── go.sum
 ```
@@ -191,7 +179,7 @@ In another terminal:
 
 | Table | Purpose |
 |-------|---------|
-| `users` | Registered CLI users |
+| `users` | Registered users |
 | `feeds` | RSS feed metadata (name, URL, owner) |
 | `feed_follows` | Many-to-many relationship between users and feeds |
 | `posts` | Individual articles scraped from feeds |
@@ -202,17 +190,21 @@ Posts are deduplicated by URL. If a post with the same URL already exists, the s
 
 ### Regenerate database code
 
-After changing files in `sql/queries/` or `sql/schema/`, run:
+After changing files in `sql/queries/` or `sql/schema/`:
 
 ```bash
 sqlc generate
 ```
 
-Generated Go code is written to `internal/database/`.
+### Run tests
+
+```bash
+go test ./...
+```
 
 ### Add a new migration
 
-Create a new numbered file in `sql/schema/` (e.g. `006_something.sql`) using goose directives:
+Create a numbered file in `sql/schema/` (e.g. `006_something.sql`):
 
 ```sql
 -- +goose Up
@@ -222,17 +214,11 @@ Create a new numbered file in `sql/schema/` (e.g. `006_something.sql`) using goo
 -- rollback
 ```
 
-Then apply it:
+Apply it:
 
 ```bash
 goose -dir sql/schema postgres "$DB_URL" up
 ```
-
-### Add a new SQL query
-
-1. Add the query to the appropriate file in `sql/queries/`
-2. Run `sqlc generate`
-3. Use the generated method from `internal/database` in a handler
 
 ## License
 

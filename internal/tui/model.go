@@ -12,6 +12,7 @@ import (
 	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/n0m-d/gator/internal/config"
 	"github.com/n0m-d/gator/internal/database"
 )
 
@@ -30,9 +31,14 @@ type tab int
 
 type model struct {
 	db       *database.Queries
+	cfg      *config.Config
 	user     database.User
 	username string
 	styles   Styles
+
+	authenticated bool
+	authMode      authMode
+	usernameInput textinput.Model
 
 	activeTab    tab
 	cursor       int
@@ -75,25 +81,37 @@ type dataLoadedMsg struct {
 
 type clearToastMsg struct{}
 
-func NewModel(db *database.Queries, user database.User, username string) model {
+func NewModel(db *database.Queries, cfg *config.Config) model {
 	aggBar := progress.New(
 		progress.WithGradient("#00A95C", "#73F59F"),
 		progress.WithWidth(40),
 		progress.WithoutPercentage(),
 	)
 
-	return model{
+	m := model{
 		db:          db,
-		user:        user,
-		username:    username,
+		cfg:         cfg,
 		styles:      NewStyles(),
-		loading:     true,
 		aggInterval: defaultAggInterval,
 		aggProgress: aggBar,
 	}
+
+	if user, username, ok := tryLoadSession(db, cfg); ok {
+		m.authenticated = true
+		m.user = user
+		m.username = username
+		m.loading = true
+	} else {
+		m.initAuthForm()
+	}
+
+	return m
 }
 
 func (m model) Init() tea.Cmd {
+	if !m.authenticated {
+		return textinput.Blink
+	}
 	return m.loadData
 }
 
@@ -167,12 +185,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		m.postsPerPage = m.calcPostsPerPage()
 		barWidth := msg.Width - 24
 		if barWidth < 20 {
 			barWidth = 20
 		}
 		m.aggProgress.Width = barWidth
+		if !m.authenticated {
+			return m, nil
+		}
+		m.postsPerPage = m.calcPostsPerPage()
 		m.loading = true
 		return m, m.loadData
 
@@ -209,6 +230,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.toastError = false
 		return m, tea.Batch(m.loadData, m.dismissToastCmd())
 
+	case authDoneMsg:
+		if msg.err != nil {
+			m.toast = msg.err.Error()
+			m.toastError = true
+			return m, m.dismissToastCmd()
+		}
+		m.authenticated = true
+		m.user = msg.user
+		m.username = msg.username
+		m.loading = true
+		m.toast = fmt.Sprintf("Welcome, %s", msg.username)
+		m.toastError = false
+		return m, tea.Batch(m.loadData, m.dismissToastCmd())
+
 	case aggTickMsg:
 		return m.handleAggTick()
 
@@ -225,6 +260,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.scheduleProgressTick()
 
 	case tea.KeyMsg:
+		if !m.authenticated {
+			return m.updateAuth(msg)
+		}
+
 		if m.addingFeed {
 			return m.updateAddFeed(msg)
 		}
@@ -404,6 +443,26 @@ func (m model) View() string {
 		return "Loading..."
 	}
 
+	if !m.authenticated {
+		header := m.styles.Banner.Render(banner)
+		auth := m.renderAuthScreen()
+		parts := []string{header, "", auth}
+		if m.toast != "" {
+			contentWidth := m.width - 4
+			if contentWidth < 20 {
+				contentWidth = 20
+			}
+			toast := lipgloss.NewStyle().
+				Width(contentWidth).
+				Align(lipgloss.Center).
+				Render(m.renderToast())
+			parts = append(parts, "", toast)
+		}
+		return lipgloss.Place(m.width, m.height, lipgloss.Left, lipgloss.Top,
+			lipgloss.JoinVertical(lipgloss.Left, parts...),
+		)
+	}
+
 	header := m.renderHeader()
 	footer := m.renderStatusBar()
 
@@ -464,10 +523,10 @@ func (m model) renderHeader() string {
 	)
 }
 
-func Run(db *database.Queries, user database.User, username string) error {
+func Run(db *database.Queries, cfg *config.Config) error {
 	defer restoreTerminal()
 
-	m := NewModel(db, user, username)
+	m := NewModel(db, cfg)
 	p := tea.NewProgram(
 		m,
 		tea.WithAltScreen(),

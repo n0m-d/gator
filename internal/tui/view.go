@@ -66,7 +66,7 @@ func (m model) renderList(items []string, header string, contentWidth, listHeigh
 
 func (m model) renderPosts(contentWidth, listHeight int) string {
 	if m.totalPosts == 0 {
-		return m.styles.Empty.Render("No posts yet. Follow some feeds and run the aggregator (./gator agg 1m).")
+		return m.styles.Empty.Render("No posts yet. Follow feeds on the Following tab, then press r to collect posts.")
 	}
 	if len(m.posts) == 0 {
 		return m.styles.Empty.Render("Loading page...")

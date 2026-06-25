@@ -50,8 +50,17 @@ func TestViewFollowingDoesNotPanic(t *testing.T) {
 	_ = m.View()
 }
 
+func TestViewAuthDoesNotPanic(t *testing.T) {
+	m := NewModel(nil, nil)
+	m.width = 80
+	m.height = 24
+
+	_ = m.View()
+}
+
 func TestViewAggregatingDoesNotPanic(t *testing.T) {
-	m := NewModel(nil, database.User{}, "tester")
+	m := NewModel(nil, nil)
+	m.authenticated = true
 	m.width = 80
 	m.height = 24
 	m.aggregating = true
