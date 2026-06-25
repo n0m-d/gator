@@ -12,6 +12,20 @@ import (
 	"github.com/google/uuid"
 )
 
+const countPostsForUser = `-- name: CountPostsForUser :one
+SELECT COUNT(*)
+FROM posts p
+INNER JOIN feed_follows ff ON ff.feed_id = p.feed_id
+WHERE ff.user_id = $1
+`
+
+func (q *Queries) CountPostsForUser(ctx context.Context, userID uuid.UUID) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countPostsForUser, userID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createPost = `-- name: CreatePost :one
 INSERT INTO posts (id, title, url, description, published_at, feed_id)
 VALUES ($1, $2, $3, $4, $5, $6)
@@ -66,6 +80,53 @@ type GetPostsForUserParams struct {
 
 func (q *Queries) GetPostsForUser(ctx context.Context, arg GetPostsForUserParams) ([]Post, error) {
 	rows, err := q.db.QueryContext(ctx, getPostsForUser, arg.UserID, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Post
+	for rows.Next() {
+		var i Post
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Title,
+			&i.Url,
+			&i.Description,
+			&i.PublishedAt,
+			&i.FeedID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPostsForUserPaginated = `-- name: GetPostsForUserPaginated :many
+SELECT p.id, p.created_at, p.updated_at, p.title, p.url, p.description, p.published_at, p.feed_id
+FROM posts p
+INNER JOIN feed_follows ff ON ff.feed_id = p.feed_id
+WHERE ff.user_id = $1
+ORDER BY p.published_at DESC NULLS LAST, p.created_at DESC
+LIMIT $2 OFFSET $3
+`
+
+type GetPostsForUserPaginatedParams struct {
+	UserID uuid.UUID
+	Limit  int32
+	Offset int32
+}
+
+func (q *Queries) GetPostsForUserPaginated(ctx context.Context, arg GetPostsForUserPaginatedParams) ([]Post, error) {
+	rows, err := q.db.QueryContext(ctx, getPostsForUserPaginated, arg.UserID, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}

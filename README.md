@@ -11,6 +11,7 @@ A command-line RSS feed aggregator written in Go. Gator lets you register users,
 - Follow and unfollow feeds per user
 - Background aggregation that fetches feeds on a schedule and stores posts in PostgreSQL
 - Browse recent posts from feeds you follow
+- Interactive terminal UI (TUI) for browsing posts and followed feeds
 
 ## Prerequisites
 
@@ -65,18 +66,49 @@ goose -dir sql/schema postgres "postgres://username:password@localhost:5432/gato
 
 ```bash
 go build -o gator .
+```
+
+**TUI mode** (no arguments — requires a logged-in user):
+
+```bash
+./gator
+```
+
+**CLI mode** (pass a command):
+
+```bash
 ./gator <command> [args...]
 ```
 
 You can also run without building:
 
 ```bash
-go run . <command> [args...]
+go run .
+go run . browse 5
 ```
 
 ## Usage
 
-### User commands
+### TUI
+
+Launch with no arguments after logging in:
+
+```bash
+./gator login alice
+./gator
+```
+
+| Key | Action |
+|-----|--------|
+| `tab` / `1` / `2` | Switch between Posts and Following tabs |
+| `j` / `k` or `↑` / `↓` | Navigate list |
+| `h` / `l` or `←` / `→` | Previous / next page (Posts tab) |
+| `r` | Refresh data from database |
+| `q` | Quit |
+
+The status bar shows the current user. Posts are loaded from feeds you follow (same as `./gator browse`).
+
+### CLI commands
 
 | Command | Description |
 |---------|-------------|
@@ -121,7 +153,7 @@ In another terminal:
 
 ```
 .
-├── main.go                 # Entry point, command registration
+├── main.go                 # Entry point; TUI when no args, CLI otherwise
 ├── commands.go             # Command dispatcher
 ├── middleware.go           # Login-required middleware
 ├── user_handler.go         # User commands (register, login, users, reset)
@@ -133,6 +165,10 @@ In another terminal:
 ├── internal/
 │   ├── config/
 │   │   └── config.go       # Reads/writes ~/.gatorconfig.json
+│   ├── tui/
+│   │   ├── model.go        # Bubble Tea model and key handling
+│   │   ├── view.go         # Lip Gloss rendering
+│   │   └── styles.go       # TUI theme/styles
 │   └── database/           # sqlc-generated query code (do not edit by hand)
 ├── sql/
 │   ├── schema/             # Goose migration files

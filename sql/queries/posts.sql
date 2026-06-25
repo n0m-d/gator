@@ -10,3 +10,17 @@ INNER JOIN feed_follows ff ON ff.feed_id = p.feed_id
 WHERE ff.user_id = $1
 ORDER BY p.published_at DESC NULLS LAST, p.created_at DESC
 LIMIT $2;
+
+-- name: GetPostsForUserPaginated :many
+SELECT p.*
+FROM posts p
+INNER JOIN feed_follows ff ON ff.feed_id = p.feed_id
+WHERE ff.user_id = $1
+ORDER BY p.published_at DESC NULLS LAST, p.created_at DESC
+LIMIT $2 OFFSET $3;
+
+-- name: CountPostsForUser :one
+SELECT COUNT(*)
+FROM posts p
+INNER JOIN feed_follows ff ON ff.feed_id = p.feed_id
+WHERE ff.user_id = $1;

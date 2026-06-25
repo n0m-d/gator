@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
@@ -9,6 +10,7 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/n0m-d/gator/internal/config"
 	"github.com/n0m-d/gator/internal/database"
+	"github.com/n0m-d/gator/internal/tui"
 )
 
 type state struct {
@@ -28,12 +30,20 @@ func main() {
 	}
 
 	dbQueries := database.New(db)
-
 	programState := &state{
 		cfg: &cfg,
 		db:  dbQueries,
 	}
 
+	if len(os.Args) >= 2 {
+		runCLI(programState, os.Args[1], os.Args[2:])
+		return
+	}
+
+	runTUI(programState)
+}
+
+func runCLI(s *state, cmdName string, cmdArgs []string) {
 	cmds := commands{
 		registeredCommands: make(map[string]func(*state, command) error),
 	}
@@ -48,27 +58,25 @@ func main() {
 	cmds.register("following", middlewareLoggedIn(handlerFollowingFeed))
 	cmds.register("unfollow", middlewareLoggedIn(handlerUnfollowFeed))
 	cmds.register("browse", middlewareLoggedIn(handlerBrowse))
-	banner :=
-		`
- ██████╗  █████╗ ████████╗ ██████╗ ██████╗ 
-██╔════╝ ██╔══██╗╚══██╔══╝██╔═══██╗██╔══██╗             
-██║  ███╗███████║   ██║   ██║   ██║██████╔╝            
-██║   ██║██╔══██║   ██║   ██║   ██║██╔══██╗    
-╚██████╔╝██║  ██║   ██║   ╚██████╔╝██║  ██║ 
- ╚═════╝ ╚═╝  ╚═╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝ 🐊 
- 
-`
-	fmt.Printf("%s%s\n%s", "\x1b[38;2;0;169;92m", banner, "\033[0m")
-	if len(os.Args) < 2 {
-		log.Print("Usage: cli <command> [args...]")
-		os.Exit(0)
+
+	if err := cmds.run(s, command{Name: cmdName, Args: cmdArgs}); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func runTUI(s *state) {
+	username, err := s.cfg.GetUser()
+	if err != nil {
+		log.Fatalf("not logged in: %v\nUse: ./gator login <name>", err)
 	}
 
-	cmdName := os.Args[1]
-	cmdArgs := os.Args[2:]
-
-	err = cmds.run(programState, command{Name: cmdName, Args: cmdArgs})
+	user, err := s.db.GetUser(context.Background(), username)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("couldn't get user %q: %v", username, err)
+	}
+
+	if err := tui.Run(s.db, user, username); err != nil {
+		fmt.Fprintf(os.Stderr, "tui error: %v\n", err)
+		os.Exit(1)
 	}
 }
