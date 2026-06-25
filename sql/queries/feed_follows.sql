@@ -36,3 +36,14 @@ WHERE ff.user_id = $1;
 -- name: DeleteFeedFollowByFeedIdAndUserId :exec
 DELETE FROM feed_follows
 WHERE feed_id = $1 AND user_id = $2;
+
+-- name: CountFeedFollowsForUser :one
+SELECT COUNT(*) FROM feed_follows WHERE user_id = $1;
+
+-- name: GetNextFeedToFetchForUser :one
+SELECT f.*
+FROM feeds f
+INNER JOIN feed_follows ff ON ff.feed_id = f.id
+WHERE ff.user_id = $1
+ORDER BY f.last_fetched_at ASC NULLS FIRST
+LIMIT 1;

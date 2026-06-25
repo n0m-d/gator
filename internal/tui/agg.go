@@ -21,7 +21,7 @@ type scrapeDoneMsg struct {
 
 func (m model) scrapeCmd() tea.Cmd {
 	return func() tea.Msg {
-		name, err := scraper.ScrapeNextFeed(context.Background(), m.db)
+		name, err := scraper.ScrapeNextFeed(context.Background(), m.db, m.user.ID)
 		return scrapeDoneMsg{feedName: name, err: err}
 	}
 }
@@ -40,7 +40,7 @@ func (m model) scheduleProgressTick() tea.Cmd {
 
 func (m model) loadFeedCount() tea.Cmd {
 	return func() tea.Msg {
-		count, err := m.db.CountFeeds(context.Background())
+		count, err := m.db.CountFeedFollowsForUser(context.Background(), m.user.ID)
 		if err != nil {
 			return feedCountMsg{err: err}
 		}
@@ -78,7 +78,7 @@ func (m model) toggleAgg() (tea.Model, tea.Cmd) {
 }
 
 func (m model) handleAggTick() (tea.Model, tea.Cmd) {
-	if !m.aggregating {
+	if !m.aggregating || m.scraping {
 		return m, nil
 	}
 	m.scraping = true
@@ -99,8 +99,15 @@ func (m model) handleScrapeDone(msg scrapeDoneMsg) (tea.Model, tea.Cmd) {
 		m.feedsFetched++
 		m.toast = fmt.Sprintf("Fetched %s", msg.feedName)
 		m.toastError = false
+		return m, tea.Batch(m.loadData, m.dismissToastCmd())
 	}
 
+	if m.totalFeeds == 0 {
+		m.toast = "No followed feeds to collect — add one on the Following tab"
+	} else {
+		m.toast = "No feeds due right now"
+	}
+	m.toastError = false
 	return m, tea.Batch(m.loadData, m.dismissToastCmd())
 }
 
@@ -141,7 +148,7 @@ func (m model) aggProgressLabel() string {
 	}
 
 	if m.totalFeeds == 0 {
-		return "No feeds to collect"
+		return "No followed feeds — press a to add one"
 	}
 
 	remaining := m.aggInterval - time.Since(m.lastScrapeAt)

@@ -11,17 +11,6 @@ import (
 	"github.com/google/uuid"
 )
 
-const countFeeds = `-- name: CountFeeds :one
-SELECT COUNT(*) FROM feeds
-`
-
-func (q *Queries) CountFeeds(ctx context.Context) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countFeeds)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const createFeed = `-- name: CreateFeed :one
 INSERT INTO feeds (id, name, url, user_id)
 VALUES (
@@ -60,68 +49,12 @@ func (q *Queries) CreateFeed(ctx context.Context, arg CreateFeedParams) (Feed, e
 	return i, err
 }
 
-const getAllFeeds = `-- name: GetAllFeeds :many
-SELECT id, name, url, user_id, created_at, updated_at, last_fetched_at FROM feeds
-`
-
-func (q *Queries) GetAllFeeds(ctx context.Context) ([]Feed, error) {
-	rows, err := q.db.QueryContext(ctx, getAllFeeds)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Feed
-	for rows.Next() {
-		var i Feed
-		if err := rows.Scan(
-			&i.ID,
-			&i.Name,
-			&i.Url,
-			&i.UserID,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.LastFetchedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getFeedByURL = `-- name: GetFeedByURL :one
 SELECT id, name, url, user_id, created_at, updated_at, last_fetched_at FROM feeds WHERE url = $1
 `
 
 func (q *Queries) GetFeedByURL(ctx context.Context, url string) (Feed, error) {
 	row := q.db.QueryRowContext(ctx, getFeedByURL, url)
-	var i Feed
-	err := row.Scan(
-		&i.ID,
-		&i.Name,
-		&i.Url,
-		&i.UserID,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.LastFetchedAt,
-	)
-	return i, err
-}
-
-const getNextFeedToFetch = `-- name: GetNextFeedToFetch :one
-SELECT id, name, url, user_id, created_at, updated_at, last_fetched_at FROM feeds
-ORDER BY last_fetched_at ASC NULLS FIRST
-LIMIT 1
-`
-
-func (q *Queries) GetNextFeedToFetch(ctx context.Context) (Feed, error) {
-	row := q.db.QueryRowContext(ctx, getNextFeedToFetch)
 	var i Feed
 	err := row.Scan(
 		&i.ID,

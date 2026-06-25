@@ -13,10 +13,10 @@ import (
 	"github.com/n0m-d/gator/internal/rss"
 )
 
-// ScrapeNextFeed fetches the next due feed and saves its posts.
-// Returns the feed name when one was scraped, or "" when there are no feeds.
-func ScrapeNextFeed(ctx context.Context, db *database.Queries) (string, error) {
-	feed, err := db.GetNextFeedToFetch(ctx)
+// ScrapeNextFeed fetches the next due feed the user follows and saves its posts.
+// Returns the feed name when one was scraped, or "" when there are no followed feeds.
+func ScrapeNextFeed(ctx context.Context, db *database.Queries, userID uuid.UUID) (string, error) {
+	feed, err := db.GetNextFeedToFetchForUser(ctx, userID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return "", nil
@@ -24,13 +24,13 @@ func ScrapeNextFeed(ctx context.Context, db *database.Queries) (string, error) {
 		return "", fmt.Errorf("couldn't get next feed to fetch: %w", err)
 	}
 
-	if err := db.MarkFeedFetched(ctx, feed.ID); err != nil {
-		return "", fmt.Errorf("couldn't mark feed as fetched: %w", err)
-	}
-
 	rssFeed, err := rss.Fetch(ctx, feed.Url)
 	if err != nil {
 		return feed.Name, fmt.Errorf("couldn't fetch feed %s: %w", feed.Name, err)
+	}
+
+	if err := db.MarkFeedFetched(ctx, feed.ID); err != nil {
+		return feed.Name, fmt.Errorf("couldn't mark feed as fetched: %w", err)
 	}
 
 	for _, item := range rssFeed.Channel.Item {

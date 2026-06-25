@@ -12,6 +12,17 @@ import (
 	"github.com/google/uuid"
 )
 
+const countFeedFollowsForUser = `-- name: CountFeedFollowsForUser :one
+SELECT COUNT(*) FROM feed_follows WHERE user_id = $1
+`
+
+func (q *Queries) CountFeedFollowsForUser(ctx context.Context, userID uuid.UUID) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countFeedFollowsForUser, userID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createFeedFollow = `-- name: CreateFeedFollow :one
 WITH inserted AS (
     INSERT INTO feed_follows (id, user_id, feed_id, created_at, updated_at)
@@ -134,4 +145,28 @@ func (q *Queries) GetFeedFollowsForUser(ctx context.Context, userID uuid.UUID) (
 		return nil, err
 	}
 	return items, nil
+}
+
+const getNextFeedToFetchForUser = `-- name: GetNextFeedToFetchForUser :one
+SELECT f.id, f.name, f.url, f.user_id, f.created_at, f.updated_at, f.last_fetched_at
+FROM feeds f
+INNER JOIN feed_follows ff ON ff.feed_id = f.id
+WHERE ff.user_id = $1
+ORDER BY f.last_fetched_at ASC NULLS FIRST
+LIMIT 1
+`
+
+func (q *Queries) GetNextFeedToFetchForUser(ctx context.Context, userID uuid.UUID) (Feed, error) {
+	row := q.db.QueryRowContext(ctx, getNextFeedToFetchForUser, userID)
+	var i Feed
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Url,
+		&i.UserID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.LastFetchedAt,
+	)
+	return i, err
 }

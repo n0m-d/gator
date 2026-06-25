@@ -67,7 +67,7 @@ goose -dir sql/schema postgres "postgres://username:password@localhost:5432/gato
 ### 4. Build and run
 
 ```bash
-go build -o gator .
+go build -o gator ./cmd/gator
 ./gator
 ```
 
@@ -149,9 +149,12 @@ Feed management, browsing, and aggregation are only available in the TUI.
 
 ```
 .
-├── main.go                     # Entry point: TUI by default, CLI for auth
+├── cmd/gator/
+│   └── main.go                 # Entry point: TUI by default, CLI for auth
 ├── internal/
 │   ├── cli/                    # Login, register, users, reset
+│   │   ├── cli.go
+│   │   └── users.go
 │   ├── config/
 │   │   └── config.go           # Reads/writes ~/.gatorconfig.json
 │   ├── database/               # sqlc-generated query code (do not edit)
