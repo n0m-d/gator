@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"encoding/xml"
 	"fmt"
 	"html"
 	"io"
 	"net/http"
+	"time"
 )
 
 type RSSFeed struct {
@@ -65,4 +67,30 @@ func fetchFeed(ctx context.Context, feedURL string) (*RSSFeed, error) {
 	}
 
 	return &feed, nil
+}
+
+func parsePublishedAt(dateStr string) sql.NullTime {
+	if dateStr == "" {
+		return sql.NullTime{}
+	}
+
+	layouts := []string{
+		time.RFC1123Z,
+		time.RFC1123,
+		time.RFC822Z,
+		time.RFC822,
+		time.RFC3339,
+		"Mon, 2 Jan 2006 15:04:05 MST",
+		"Mon, 02 Jan 2006 15:04:05 MST",
+		"2006-01-02T15:04:05Z07:00",
+		"2006-01-02",
+	}
+
+	for _, layout := range layouts {
+		if t, err := time.Parse(layout, dateStr); err == nil {
+			return sql.NullTime{Time: t, Valid: true}
+		}
+	}
+
+	return sql.NullTime{}
 }
